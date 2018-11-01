@@ -4,16 +4,12 @@ import isEqual from 'lodash.isequal';
 
 import MenuItem from '../../MenuItem';
 import Menu from '../../Menu/Menu';
-import { DefaultState } from '../CustomComboBox';
-import CustomComboBox, {
-  CustomComboBoxProps,
-  CustomComboBoxState
-} from '../CustomComboBox';
 import LayoutEvents from '../../../lib/LayoutEvents';
 import { Nullable } from '../../../typings/utility-types';
 import warning from 'warning';
 import ComboBoxView from '../ComboBoxView';
 import reactGetTextContent from '../../../lib/reactGetTextContent/reactGetTextContent';
+import { CustomComboBoxProps, CustomComboBoxState, defaultState } from "../types";
 
 interface BaseAction {
   type: string;
@@ -43,7 +39,7 @@ export type EffectType = (
   dispatch: (action: Action) => void,
   getState: () => State,
   getProps: () => Props,
-  getInstance: () => CustomComboBox
+  getInstance: () => any // CustomComboBox
 ) => void;
 
 export type Reducer = (
@@ -200,7 +196,7 @@ const Effect = {
 };
 
 const reducers: { [type: string]: Reducer } = {
-  Mount: () => ({ ...DefaultState, inputChanged: false }),
+  Mount: () => ({ ...defaultState, inputChanged: false }),
   DidUpdate(state, props, action) {
     if (isEqual(props.value, action.prevProps.value)) {
       return state;
@@ -347,7 +343,7 @@ const reducers: { [type: string]: Reducer } = {
     ];
   },
   Reset() {
-    return DefaultState;
+    return defaultState;
   }
 };
 

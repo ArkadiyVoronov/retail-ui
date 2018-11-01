@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { ChangeEvent, FocusEvent, KeyboardEvent } from 'react';
-import * as ReactDOM from 'react-dom';
+import { KeyboardEvent } from 'react';
 import TextWidthHelper from './TextWidthHelper';
 import TokenInputMenu from './TokenInputMenu';
 import { TokenInputAction, tokenInputReducer } from './TokenInputReducer';
@@ -9,6 +8,7 @@ import styles from './TokenInput.less';
 import cn from 'classnames';
 import Menu from '../Menu/Menu';
 import RemoveIcon from './RemoveIcon';
+import CustomComboBox from "../CustomComboBox/CustomComboBox";
 
 export enum TokenInputType {
   WithReference,
@@ -16,14 +16,14 @@ export enum TokenInputType {
   Combined
 }
 
-export interface TokenInputProps<T> {
+export interface TokenInputProps<T = string> {
   type?: TokenInputType;
-  selectedItems: T[];
-  onChange: (items: T[]) => void;
-  getItems?: (query: string) => Promise<T[]>;
+  selectedItems: string[];
+  onChange: (items: string[]) => void;
+  getItems?: (query: string) => Promise<any[]>;
   hideMenuIfEmptyInputValue?: boolean;
-  renderItem?: (item: T) => React.ReactNode;
-  renderValue?: (item: T) => React.ReactNode;
+  renderItem?: (item: string) => React.ReactNode;
+  renderValue?: (item: string) => React.ReactNode;
   renderNotFound?: () => React.ReactNode;
   placeholder?: string;
   delimiters?: string[];
@@ -31,9 +31,9 @@ export interface TokenInputProps<T> {
   warning?: boolean;
 }
 
-export interface TokenInputState<T> {
-  autocompleteItems?: T[];
-  activeTokens: T[];
+export interface TokenInputState<T = string> {
+  activeTokens: string[];
+  autocompleteItems?: string[];
   inFocus?: boolean;
   inputValue: string;
   inputValueWidth: number;
@@ -44,8 +44,8 @@ export interface TokenInputState<T> {
  * DRAFT - поле с токенами
  */
 export default class TokenInput<T = string> extends React.Component<
-  TokenInputProps<T>,
-  TokenInputState<T>
+  TokenInputProps,
+  TokenInputState
 > {
   public state: TokenInputState<T> = {
     inputValue: '',
@@ -54,10 +54,11 @@ export default class TokenInput<T = string> extends React.Component<
   };
 
   private root: HTMLDivElement | null = null;
-  private input: HTMLInputElement | null = null;
+  // private input: HTMLInputElement | null = null;
   private tokensInputMenu: TokenInputMenu<T> | null = null;
   private textHelper: TextWidthHelper | null = null;
   private wrapper: HTMLLabelElement | null = null;
+  private combobox: CustomComboBox | null = null;
 
   public componentDidMount() {
     this.updateInputTextWidth();
@@ -80,9 +81,9 @@ export default class TokenInput<T = string> extends React.Component<
     if (prevProps.selectedItems.length !== this.props.selectedItems.length) {
       LayoutEvents.emit();
     }
-    if (!this.isCursorVisibleForState(prevState) && this.isCursorVisible) {
-      this.tryGetItems(this.state.inputValue);
-    }
+    // if (!this.isCursorVisibleForState(prevState) && this.isCursorVisible) {
+    //   this.tryGetItems(this.state.inputValue);
+    // }
   }
 
   public componentWillUnmount() {
@@ -94,23 +95,26 @@ export default class TokenInput<T = string> extends React.Component<
       throw Error('Missed getItems for type ' + this.type);
     }
 
-    const showMenu =
-      this.type !== TokenInputType.WithoutReference &&
-      this.isCursorVisible &&
-      this.state.activeTokens.length === 0 &&
-      (this.state.inputValue !== '' || !this.props.hideMenuIfEmptyInputValue);
+    // const showMenu =
+    //   this.type !== TokenInputType.WithoutReference &&
+    //   this.isCursorVisible &&
+    //   this.state.activeTokens.length === 0 &&
+    //   (this.state.inputValue !== '' || !this.props.hideMenuIfEmptyInputValue);
+    //
+    // const inputInlineStyles: React.CSSProperties = {
+    //   // вычисляем ширину чтобы input автоматически перенёсся на следующую строку при необходимости
+    //   width: Math.max(50, this.state.inputValueWidth! + 7),
+    //   // input растягивается на всю ширину чтобы placeholder не обрезался
+    //   flex:
+    //     this.props.selectedItems && this.props.selectedItems.length === 0
+    //       ? 1
+    //       : undefined,
+    //   // в ie не работает, но альтернативный способ --- дать tabindex для label --- предположительно ещё сложнее
+    //   caretColor: this.isCursorVisible ? undefined : 'transparent'
+    // };
 
-    const inputInlineStyles: React.CSSProperties = {
-      // вычисляем ширину чтобы input автоматически перенёсся на следующую строку при необходимости
-      width: Math.max(50, this.state.inputValueWidth! + 7),
-      // input растягивается на всю ширину чтобы placeholder не обрезался
-      flex:
-        this.props.selectedItems && this.props.selectedItems.length === 0
-          ? 1
-          : undefined,
-      // в ie не работает, но альтернативный способ --- дать tabindex для label --- предположительно ещё сложнее
-      caretColor: this.isCursorVisible ? undefined : 'transparent'
-    };
+    const showPlaceholder = this.props.selectedItems.length === 0;
+    const width = showPlaceholder ? '100%' : Math.max(50, this.state.inputValueWidth! + 19);
 
     return (
       <div data-tid="TokenInput" ref={this.rootRef} className={styles.root}>
@@ -127,44 +131,68 @@ export default class TokenInput<T = string> extends React.Component<
             [styles.warning]: this.props.warning
           })}
           onMouseDown={this.handleWrapperMouseDown}
-          onMouseUp={this.handleWrapperMouseUp}
-        >
+          onMouseUp={this.handleWrapperMouseUp}>
           {this.renderTokenFields()}
-          <input
-            type="text"
-            ref={this.inputRef}
-            value={this.state.inputValue}
-            style={inputInlineStyles}
-            autoComplete="off"
-            spellCheck={false}
-            className={styles.input}
-            placeholder={
-              this.props.selectedItems.length > 0
-                ? undefined
-                : this.props.placeholder
-            }
-            onFocus={this.handleInputFocus}
-            onBlur={this.handleInputBlur}
-            onChange={this.handleChangeInputValue}
+          <CustomComboBox
+            ref={el => this.combobox = el}
+            getItems={this.tryGetItems}
+            renderValue={this.props.renderValue}
+            renderItem={this.props.renderItem}
+            renderNotFound={this.props.renderNotFound}
+            onInputChange={this.handleChangeInputValue}
+            onChange={(_, value) =>this.handleAddItem(value)}
             onKeyDown={this.handleKeyDown}
             onPaste={this.handleInputPaste}
-          />
-        </label>
-        {showMenu && (
-          <TokenInputMenu
-            ref={this.tokensInputMenuRef}
-            anchorElement={this.input!}
-            inputValue={this.state.inputValue}
-            onAddItem={this.handleAddItem}
-            autocompleteItems={this.state.autocompleteItems}
-            renderNotFound={this.props.renderNotFound}
-            renderItem={this.props.renderItem}
-            showAddItemHint={
-              this.type === TokenInputType.Combined &&
-              this.state.inputValue !== ''
+            width={width}
+            autocomplete
+            borderless
+            onFocus={() => {
+              const style = this.combobox!.input!.input!.style;
+              style.flex = this.props.selectedItems && this.props.selectedItems.length === 0
+                    ? '1'
+                    : null;
+              style.borderColor = 'transparent'
+              style.boxShadow = 'none'
+            }}
+            placeholder={
+              showPlaceholder
+                ? this.props.placeholder
+                : undefined
             }
           />
-        )}
+          {/*<input*/}
+          {/*type="text"*/}
+          {/*ref={this.inputRef}*/}
+          {/*value={this.state.inputValue}*/}
+          {/*style={inputInlineStyles}*/}
+          {/*className={styles.input}*/}
+          {/*placeholder={*/}
+          {/*this.props.selectedItems.length > 0*/}
+          {/*? undefined*/}
+          {/*: this.props.placeholder*/}
+          {/*}*/}
+          {/*onFocus={this.handleInputFocus}*/}
+          {/*onBlur={this.handleInputBlur}*/}
+          {/*onChange={this.handleChangeInputValue}*/}
+          {/*onKeyDown={this.handleKeyDown}*/}
+          {/*onPaste={this.handleInputPaste}*/}
+          {/*/>*/}
+        </label>
+        {/*{showMenu && (*/}
+        {/*<TokenInputMenu*/}
+        {/*ref={this.tokensInputMenuRef}*/}
+        {/*anchorElement={this.input!}*/}
+        {/*inputValue={this.state.inputValue}*/}
+        {/*onAddItem={this.handleAddItem}*/}
+        {/*autocompleteItems={this.state.autocompleteItems}*/}
+        {/*renderNotFound={this.props.renderNotFound}*/}
+        {/*renderItem={this.props.renderItem}*/}
+        {/*showAddItemHint={*/}
+        {/*this.type === TokenInputType.Combined &&*/}
+        {/*this.state.inputValue !== ''*/}
+        {/*}*/}
+        {/*/>*/}
+        {/*)}*/}
       </div>
     );
   }
@@ -182,7 +210,7 @@ export default class TokenInput<T = string> extends React.Component<
   }
 
   private get isCursorVisible() {
-    return this.isCursorVisibleForState(this.state);
+    return this.combobox!.input!.input!.value
   }
 
   private isCursorVisibleForState(state: TokenInputState<T>) {
@@ -193,9 +221,9 @@ export default class TokenInput<T = string> extends React.Component<
   }
 
   private rootRef = (node: HTMLDivElement) => (this.root = node);
-  private inputRef = (node: HTMLInputElement) => (this.input = node);
-  private tokensInputMenuRef = (node: TokenInputMenu<T>) =>
-    (this.tokensInputMenu = node);
+  // private inputRef = (node: HTMLInputElement) => (this.input = node);
+  // private tokensInputMenuRef = (node: TokenInputMenu<T>) =>
+  //   (this.tokensInputMenu = node);
   private textHelperRef = (node: TextWidthHelper) => (this.textHelper = node);
   private wrapperRef = (node: HTMLLabelElement) => (this.wrapper = node);
 
@@ -213,34 +241,34 @@ export default class TokenInput<T = string> extends React.Component<
     }
   }
 
-  private handleInputFocus = () => {
-    this.dispatch({ type: 'SET_FOCUS_IN' });
-  };
+  // private handleInputFocus = () => {
+  //   this.dispatch({ type: 'SET_FOCUS_IN' });
+  // };
 
-  private handleInputBlur = (event: FocusEvent<HTMLInputElement>) => {
-    if (this.isBlurToMenu(event) || this.state.preventBlur) {
-      event.preventDefault();
-      // первый focus нужен для предотвращения/уменьшения моргания в других браузерах
-      this.input!.focus();
-      // в firefox не работает без второго focus
-      process.nextTick(() => this.input!.focus());
-      this.dispatch({ type: 'SET_PREVENT_BLUR', payload: false });
-    } else {
-      this.dispatch({ type: 'BLUR' });
-    }
-  };
+  // private handleInputBlur = (event: FocusEvent<HTMLInputElement>) => {
+  //   if (this.isBlurToMenu(event) || this.state.preventBlur) {
+  //     event.preventDefault();
+  //     // первый focus нужен для предотвращения/уменьшения моргания в других браузерах
+  //     this.input!.focus();
+  //     // в firefox не работает без второго focus
+  //     process.nextTick(() => this.input!.focus());
+  //     this.dispatch({ type: 'SET_PREVENT_BLUR', payload: false });
+  //   } else {
+  //     this.dispatch({ type: 'BLUR' });
+  //   }
+  // };
 
-  private isBlurToMenu = (event: FocusEvent<HTMLElement>) => {
-    if (this.menuRef) {
-      const menu = ReactDOM.findDOMNode(this.menuRef) as HTMLElement | null;
-      const relatedTarget = (event.relatedTarget ||
-        document.activeElement) as HTMLElement;
-      if (menu && menu.contains(relatedTarget)) {
-        return true;
-      }
-    }
-    return false;
-  };
+  // private isBlurToMenu = (event: FocusEvent<HTMLElement>) => {
+  //   if (this.menuRef) {
+  //     const menu = ReactDOM.findDOMNode(this.menuRef) as HTMLElement | null;
+  //     const relatedTarget = (event.relatedTarget ||
+  //       document.activeElement) as HTMLElement;
+  //     if (menu && menu.contains(relatedTarget)) {
+  //       return true;
+  //     }
+  //   }
+  //   return false;
+  // };
 
   private handleWrapperMouseDown = (event: React.MouseEvent<HTMLElement>) => {
     this.dispatch({ type: 'SET_PREVENT_BLUR', payload: true });
@@ -248,8 +276,8 @@ export default class TokenInput<T = string> extends React.Component<
     const isClickOnToken =
       target &&
       this.wrapper!.contains(target) &&
-      target !== this.wrapper! &&
-      target !== this.input!;
+      target !== this.wrapper!
+      // target !== this.combobox!.input!;
     if (!isClickOnToken) {
       this.dispatch({ type: 'REMOVE_ALL_ACTIVE_TOKENS' });
     }
@@ -277,7 +305,7 @@ export default class TokenInput<T = string> extends React.Component<
     event.clipboardData.setData('text/plain', tokens.join(this.delimiters[0]));
   };
 
-  private handleInputPaste = (event: React.ClipboardEvent<HTMLElement>) => {
+  private handleInputPaste = (event: React.ClipboardEvent<Element>) => {
     if (this.type === TokenInputType.WithReference || !event.clipboardData) {
       return;
     }
@@ -295,28 +323,17 @@ export default class TokenInput<T = string> extends React.Component<
   };
 
   private tryGetItems = async (query: string = '') => {
-    if (
-      this.props.getItems &&
-      (this.state.inputValue !== '' || !this.props.hideMenuIfEmptyInputValue)
-    ) {
-      const autocompleteItems = await this.props.getItems(query);
-
-      const autocompleteItemsUnique = autocompleteItems.filter(
-        item => !this.props.selectedItems.includes(item)
-      );
-      if (query === '' || this.state.inputValue !== '') {
-        this.dispatch(
-          { type: 'SET_AUTOCOMPLETE_ITEMS', payload: autocompleteItemsUnique },
-          () => {
-            LayoutEvents.emit();
-            this.highlightMenuItem();
-          }
-        );
-      }
+    if (!this.props.getItems) {
+      return []
     }
+
+    const autocompleteItems = await this.props.getItems(query);
+    return autocompleteItems.filter(
+      item => !this.props.selectedItems.includes(item)
+    );
   };
 
-  private handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  private handleKeyDown = (event: KeyboardEvent) => {
     if (this.isCursorVisible) {
       this.handleInputKeyDown(event);
     } else {
@@ -324,7 +341,7 @@ export default class TokenInput<T = string> extends React.Component<
     }
   };
 
-  private handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+  private handleInputKeyDown = (event: KeyboardEvent) => {
     event.stopPropagation();
 
     if (
@@ -332,7 +349,9 @@ export default class TokenInput<T = string> extends React.Component<
       (event.key === 'Enter' || this.delimiters.includes(event.key))
     ) {
       event.preventDefault();
-      const newValue = this.state.inputValue as any;
+      const newValue = this.combobox!.input!.input!.value;
+      this.combobox!.reset();
+      this.focusInput()
       if (newValue !== '') {
         this.handleAddItem(newValue);
       }
@@ -341,7 +360,7 @@ export default class TokenInput<T = string> extends React.Component<
     switch (event.key) {
       case 'Enter':
         if (this.menuRef) {
-          this.menuRef.enter(event);
+          this.menuRef.enter(event as React.KeyboardEvent<HTMLInputElement>);
         }
         break;
       case 'ArrowUp':
@@ -356,13 +375,13 @@ export default class TokenInput<T = string> extends React.Component<
         }
         break;
       case 'Escape':
-        this.input!.blur();
+        this.combobox!.blur();
         break;
       case 'Backspace':
         this.moveFocusToLastToken();
         break;
       case 'ArrowLeft':
-        if (this.input!.selectionStart === 0) {
+        if (this.combobox!.input!.input!.selectionStart === 0) {
           this.moveFocusToLastToken();
         }
         break;
@@ -377,10 +396,10 @@ export default class TokenInput<T = string> extends React.Component<
   }
 
   private focusInput = () => {
-    process.nextTick(() => this.input!.focus());
+    process.nextTick(() => this.combobox!.focus());
   };
 
-  private handleWrapperKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+  private handleWrapperKeyDown = (event: KeyboardEvent) => {
     switch (event.key) {
       case 'Backspace':
       case 'Delete':
@@ -390,7 +409,7 @@ export default class TokenInput<T = string> extends React.Component<
         this.props.onChange(itemsNew);
         this.dispatch({ type: 'REMOVE_ALL_ACTIVE_TOKENS' }, () => {
           LayoutEvents.emit();
-          this.input!.focus();
+          this.combobox!.focus();
         });
         break;
       case 'ArrowLeft':
@@ -412,7 +431,7 @@ export default class TokenInput<T = string> extends React.Component<
     }
   };
 
-  private handleWrapperArrows = (event: KeyboardEvent<HTMLElement>) => {
+  private handleWrapperArrows = (event: KeyboardEvent) => {
     event.preventDefault();
     const activeTokens = this.state.activeTokens;
     const activeItemIndex = this.props.selectedItems.indexOf(activeTokens[0]);
@@ -440,7 +459,7 @@ export default class TokenInput<T = string> extends React.Component<
   ) => {
     if (isRightEdge) {
       this.dispatch({ type: 'REMOVE_ALL_ACTIVE_TOKENS' }, () =>
-        this.input!.focus()
+        this.combobox!.focus()
       );
     } else if (!isLeftEdge) {
       this.dispatch({
@@ -465,7 +484,7 @@ export default class TokenInput<T = string> extends React.Component<
     }
   };
 
-  private handleAddItem = (item: T) => {
+  private handleAddItem = (item: string) => {
     if (this.props.selectedItems.includes(item)) {
       return;
     }
@@ -474,13 +493,13 @@ export default class TokenInput<T = string> extends React.Component<
     this.tryGetItems();
   };
 
-  private handleAddItems(items: T[]) {
+  private handleAddItems(items: string[]) {
     items = items.filter(item => !this.props.selectedItems.includes(item));
     const newItems = this.props.selectedItems.concat(items);
     this.props.onChange(newItems);
   }
 
-  private handleRemoveToken = (item: T) => {
+  private handleRemoveToken = (item: string) => {
     this.props.onChange(this.props.selectedItems.filter(_ => _ !== item));
     const filteredActiveTokens = this.state.activeTokens.filter(
       _ => _ !== item
@@ -493,7 +512,7 @@ export default class TokenInput<T = string> extends React.Component<
 
   private handleTokenClick = (
     event: React.MouseEvent<HTMLElement>,
-    itemNew: T
+    itemNew: string
   ) => {
     const items = this.state.activeTokens;
     if (event.ctrlKey) {
@@ -504,35 +523,33 @@ export default class TokenInput<T = string> extends React.Component<
     } else {
       this.dispatch({ type: 'SET_ACTIVE_TOKENS', payload: [itemNew] });
     }
-    this.focusInput();
   };
 
-  private handleChangeInputValue = (event: ChangeEvent<HTMLInputElement>) => {
-    let query = event.target.value.trimLeft();
+  private handleChangeInputValue = (value: string) => {
+    let query = value.trimLeft();
     if (query.endsWith(' ')) {
       query = query.trimRight() + ' ';
     }
     if (this.state.inputValue !== '' && query === '') {
       this.dispatch({ type: 'SET_AUTOCOMPLETE_ITEMS', payload: undefined });
     }
-    this.dispatch({ type: 'UPDATE_QUERY', payload: query }, () =>
-      this.tryGetItems(query)
+    this.dispatch({ type: 'UPDATE_QUERY', payload: query }
     );
   };
 
-  private highlightMenuItem = () => {
-    if (
-      this.menuRef &&
-      this.state.autocompleteItems &&
-      this.state.autocompleteItems.length > 0 &&
-      this.type !== TokenInputType.Combined
-    ) {
-      this.menuRef.highlightItem(0);
-    }
-  };
+  // private highlightMenuItem = () => {
+  //   if (
+  //     this.menuRef &&
+  //     this.state.autocompleteItems &&
+  //     this.state.autocompleteItems.length > 0 &&
+  //     this.type !== TokenInputType.Combined
+  //   ) {
+  //     this.menuRef.highlightItem(0);
+  //   }
+  // };
 
   private renderTokenFields = () => {
-    const renderValue = this.props.renderValue || ((item: T) => item);
+    const renderValue = this.props.renderValue || ((item: string) => item);
     return this.props.selectedItems.map((item, index) => {
       const isSelected = this.state.activeTokens.indexOf(item) !== -1;
       const handleIconClick: React.MouseEventHandler<SVGElement> = event => {
@@ -549,8 +566,7 @@ export default class TokenInput<T = string> extends React.Component<
         <div
           key={index}
           onClick={handleTokenClick}
-          className={cn(styles.token, { [styles.tokenActive]: isSelected })}
-        >
+          className={cn(styles.token, { [styles.tokenActive]: isSelected })}>
           {renderValue(item)}
           <RemoveIcon className={styles.removeIcon} onClick={handleIconClick} />
         </div>

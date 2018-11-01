@@ -37,6 +37,7 @@ class Wrapper extends React.Component<any, any> {
     return (
       <TokenInput
         {...this.props}
+        renderItem={item => item}
         selectedItems={this.state.selectedItems}
         onChange={itemsNew => this.setState({ selectedItems: itemsNew })}
       />

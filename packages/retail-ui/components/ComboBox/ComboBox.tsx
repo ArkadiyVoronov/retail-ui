@@ -6,6 +6,7 @@ import { reducers as autocompleteReducers } from '../CustomComboBox/reducer/auto
 
 import CustomComboBox from '../CustomComboBox';
 import { Nullable } from '../../typings/utility-types';
+import { KeyboardEvent } from "react";
 
 export interface ComboBoxProps<T> {
   align?: 'left' | 'center' | 'right';
@@ -74,6 +75,9 @@ export interface ComboBoxProps<T> {
    * с которым будет вызван onChange.
    */
   onUnexpectedInput?: (query: string) => void | null | T;
+
+  onKeyDown?: (event: KeyboardEvent) => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLElement>) => void;
 
   placeholder?: string;
 
@@ -159,17 +163,10 @@ class ComboBox<T> extends React.Component<ComboBoxProps<T>> {
   }
 
   public render() {
-    const { autocomplete, ...rest } = this.props;
-    const props = {
-      ...rest,
-      openButton: !autocomplete,
-      reducer: autocomplete ? autocompleteReducer : defaultReducer
-    };
-
     return (
       // @ts-ignore
       <CustomComboBox
-        {...props}
+        {...this.props}
         ref={element => (this.comboboxElement = element)}
       />
     );

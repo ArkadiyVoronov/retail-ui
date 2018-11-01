@@ -16,10 +16,10 @@ export type TokenInputActionType =
   | 'REMOVE_ALL_ACTIVE_TOKENS'
   | 'CLEAR_INPUT';
 
-export function tokenInputReducer<T>(
-  state: TokenInputState<T>,
+export function tokenInputReducer<T = string>(
+  state: TokenInputState,
   action: TokenInputAction
-) {
+): any {
   const payload = action.payload;
   switch (action.type) {
     case 'SET_INPUT_VALUE_WIDTH': {

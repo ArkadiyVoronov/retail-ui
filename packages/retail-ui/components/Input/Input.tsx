@@ -96,7 +96,7 @@ class Input extends React.Component<InputProps, InputState> {
 
   private blinkTimeout: number = 0;
 
-  private input: HTMLInputElement | null = null;
+  public input: HTMLInputElement | null = null;
 
   public componentDidMount() {
     if (polyfillPlaceholder) {

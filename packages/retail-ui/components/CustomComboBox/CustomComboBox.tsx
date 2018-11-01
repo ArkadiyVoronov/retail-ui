@@ -6,90 +6,23 @@ import Input from '../Input';
 import Menu from '../Menu/Menu';
 import InputLikeText from '../internal/InputLikeText';
 import shallow from 'fbjs/lib/shallowEqual';
+import createReducer from "./reducer";
+import { Reducer, reducers as defaultReducers } from "./reducer/default";
+import { reducers as autocompleteReducers } from "./reducer/autocomplete";
+import { Action, CustomComboBoxState, defaultState, Effect, Props } from "./types";
 
-export type Action<T> =
-  | { type: 'ValueChange'; value: T }
-  | { type: 'TextChange'; value: string }
-  | { type: 'KeyPress'; event: React.KeyboardEvent }
-  | {
-      type: 'DidUpdate';
-      prevProps: CustomComboBoxProps<T>;
-      prevState: CustomComboBoxState<T>;
-    }
-  | { type: 'Mount' }
-  | { type: 'Focus' }
-  | { type: 'Blur' }
-  | { type: 'Reset' };
-
-export interface CustomComboBoxProps<T> {
-  align?: 'left' | 'center' | 'right';
-  autoFocus?: boolean;
-  borderless?: boolean;
-  disablePortal?: boolean;
-  disabled?: boolean;
-  error?: boolean;
-  maxLength?: number;
-  menuAlign?: 'left' | 'right';
-  openButton?: boolean;
-  onMouseEnter?: (e: React.MouseEvent) => void;
-  onMouseOver?: (e: React.MouseEvent) => void;
-  onMouseLeave?: (e: React.MouseEvent) => void;
-  placeholder?: string;
-  size?: 'small' | 'medium' | 'large';
-  totalCount?: number;
-  value?: Nullable<T>;
-  warning?: boolean;
-  width?: string | number;
-  maxMenuHeight?: number | string;
-  renderItem?: (x0: T, index?: number) => React.ReactNode;
-  renderNotFound?: () => React.ReactNode;
-  renderValue?: (x0: T) => React.ReactNode;
-  renderTotalCount?: (x0: number, x1: number) => React.ReactNode;
-  valueToString?: (x0: T) => string;
-}
-
-export interface CustomComboBoxState<T> {
-  editing: boolean;
-  loading: boolean;
-  opened: boolean;
-  textValue: string;
-  items: Nullable<T[]>;
-}
-
-export type Effect<T> = (
-  dispatch: (x0: Action<T>) => void,
-  getState: () => CustomComboBoxState<T>,
-  getProps: () => CustomComboBoxProps<T>,
-  getInstance: () => CustomComboBox
-) => void;
-
-export type Reducer<T> = (
-  state: CustomComboBoxState<T>,
-  props: CustomComboBoxProps<T>,
-  action: Action<T>
-) => CustomComboBoxState<T> | [CustomComboBoxState<T>, Array<Effect<T>>];
-
-export type Props<T> = {
-  reducer: Reducer<T>;
-} & CustomComboBoxProps<T>;
-
-export const DefaultState = {
-  editing: false,
-  items: null,
-  loading: false,
-  opened: false,
-  textValue: ''
-};
+const defaultReducer = createReducer(defaultReducers);
+const autocompleteReducer = createReducer(autocompleteReducers);
 
 class CustomComboBox extends React.Component<
   Props<any>,
   CustomComboBoxState<any>
 > {
-  public state: CustomComboBoxState<any> = DefaultState;
+  public state: CustomComboBoxState<any> = defaultState;
   public input: Nullable<Input>;
   public menu: Nullable<Menu>;
   public inputLikeText: Nullable<InputLikeText>;
-  private focused: boolean = false;
+  public focused: boolean = false;
 
   /**
    * @public
@@ -125,7 +58,7 @@ class CustomComboBox extends React.Component<
       loading: this.state.loading,
       menuAlign: this.props.menuAlign,
       opened: this.state.opened,
-      openButton: this.props.openButton,
+      openButton: !this.props.autocomplete,
       placeholder: this.props.placeholder,
       size: this.props.size,
       textValue: this.state.textValue,
@@ -147,7 +80,11 @@ class CustomComboBox extends React.Component<
       onInputKeyDown: (event: React.KeyboardEvent) => {
         event.persist();
         this.dispatch({ type: 'KeyPress', event });
+        if (this.props.onKeyDown){
+          this.props.onKeyDown(event)
+        }
       },
+      onPaste: this.props.onPaste,
       onMouseEnter: this.props.onMouseEnter,
       onMouseOver: this.props.onMouseOver,
       onMouseLeave: this.props.onMouseLeave,
@@ -201,10 +138,15 @@ class CustomComboBox extends React.Component<
 
   private dispatch = (action: Action<any>) => {
     let effects: Array<Effect<any>>;
+    // todo: слишком много any
+    const reducer = this.props.autocomplete
+      ? autocompleteReducer as Reducer
+      : defaultReducer as any;
+
     this.setState(
       state => {
         let nextState;
-        let stateAndEffect = this.props.reducer(state, this.props, action);
+        let stateAndEffect = reducer(state, this.props, action);
         if (!Array.isArray(stateAndEffect)) {
           stateAndEffect = [stateAndEffect, []];
         }

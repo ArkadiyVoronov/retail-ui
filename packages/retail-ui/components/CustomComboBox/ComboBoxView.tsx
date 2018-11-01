@@ -9,6 +9,7 @@ import MenuItem from '../MenuItem';
 import RenderLayer from '../RenderLayer';
 import Spinner from '../Spinner';
 import { Nullable } from '../../typings/utility-types';
+import { KeyboardEvent } from "react";
 
 interface ComboBoxViewProps<T> {
   align?: 'left' | 'center' | 'right';
@@ -44,6 +45,8 @@ interface ComboBoxViewProps<T> {
   onMouseEnter?: (e: React.MouseEvent) => void;
   onMouseOver?: (e: React.MouseEvent) => void;
   onMouseLeave?: (e: React.MouseEvent) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onPaste?: (event: React.ClipboardEvent<HTMLElement>) => void;
   renderItem?: (item: T) => React.ReactNode;
   renderNotFound?: () => React.ReactNode;
   renderTotalCount?: (found: number, total: number) => React.ReactNode;
@@ -271,6 +274,7 @@ class ComboBoxView<T> extends React.Component<ComboBoxViewProps<T>> {
       onInputChange,
       onInputFocus,
       onInputKeyDown,
+      onPaste,
       openButton,
       placeholder,
       renderValue,
@@ -295,6 +299,7 @@ class ComboBoxView<T> extends React.Component<ComboBoxViewProps<T>> {
           rightIcon={openButton ? <span /> : null}
           value={textValue || ''}
           onKeyDown={onInputKeyDown}
+          onPaste={onPaste}
           placeholder={placeholder}
           width="100%"
           size={size}
