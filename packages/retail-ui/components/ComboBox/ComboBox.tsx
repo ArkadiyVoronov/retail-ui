@@ -74,7 +74,8 @@ export interface ComboBoxProps<T> {
    * не равное `null` и `undefined`,
    * с которым будет вызван onChange.
    */
-  onUnexpectedInput?: (query: string) => void | null | T;
+  // Закоментировал функцию, для проверки логики работы с https://github.com/skbkontur/retail-ui/issues/1100#issue-403687921
+  // onUnexpectedInput?: (query: string) => void | null | T;
 
   placeholder?: string;
 
