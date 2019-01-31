@@ -540,7 +540,7 @@ class Select<TValue = {}, TItem = {}> extends React.Component<
       return [];
     }
     const pattern =
-      this.state.searchPattern && this.state.searchPattern.toLowerCase();
+      this.state.searchPattern;
 
     const result: React.ReactNodeArray = [];
     let index = 0;
